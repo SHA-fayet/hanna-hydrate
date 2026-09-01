@@ -36,6 +36,9 @@ const BackgroundEffects = () => (
   </div>
 );
 
+// Global flag to prevent React StrictMode double-initialization crashes
+let oneSignalInitialized = false;
+
 export default function App() {
   const [username, setUsername] = useState(() => localStorage.getItem('hannahydrate_session') || "");
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('hannahydrate_session'));
@@ -49,15 +52,18 @@ export default function App() {
   const [currentSkinTip, setCurrentSkinTip] = useState("");
   const [currentHealthTip, setCurrentHealthTip] = useState("");
 
-  // Initialize OneSignal on App Load
   useEffect(() => {
-    const initOneSignal = async () => {
-      await OneSignal.init({
-        appId: "f187475b-64ca-4313-8c8a-f70b8607d20c", 
+    if (!oneSignalInitialized) {
+      OneSignal.init({
+        appId: "f187475b-64ca-4313-8c8a-f70b8607d20c",
         allowLocalhostAsSecureOrigin: true,
+      }).then(() => {
+        oneSignalInitialized = true;
+        console.log("OneSignal Successfully Initialized");
+      }).catch(err => {
+        console.error("OneSignal Init Error:", err);
       });
-    };
-    initOneSignal();
+    }
   }, []);
 
   useEffect(() => {
@@ -72,13 +78,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && oneSignalInitialized) {
       const savedData = localStorage.getItem(`water_data_${username}`);
       setConsumed(savedData ? JSON.parse(savedData) : 0);
       
-      // Tell OneSignal who this user is so they receive targeted pushes
-      OneSignal.login(username);
-      OneSignal.User.addTag("is_active", "true");
+      try {
+        OneSignal.User.addTag("is_active", "true");
+      } catch (err) {
+        console.error("Tagging error:", err);
+      }
     }
   }, [isAuthenticated, username]);
 
@@ -121,10 +129,13 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    // Remove tags and logout from push server so they don't get alerts while logged out
-    OneSignal.User.removeTag("is_active");
-    OneSignal.logout();
-    
+    if (oneSignalInitialized) {
+      try {
+        OneSignal.User.removeTag("is_active");
+      } catch (err) {
+        console.error("Untagging error:", err);
+      }
+    }
     localStorage.removeItem('hannahydrate_session');
     setIsAuthenticated(false);
     setUsername("");
@@ -132,23 +143,19 @@ export default function App() {
   };
 
   const requestNotificationPermission = async () => {
-    // Check if the browser natively blocked it
-    if (Notification.permission === "denied") {
-      alert("❌ Your browser is blocking notifications! Click the lock icon in the URL bar to fix it.");
-      return;
-    }
-    
-    // Check if they are already active
-    if (Notification.permission === "granted") {
-      alert("✨ You are already subscribed! Your hourly alerts are active.");
-      return;
-    }
-
-    // Otherwise, ask OneSignal to trigger the prompt
     try {
+      console.log("Requesting permission from OneSignal engine...");
       await OneSignal.Notifications.requestPermission();
+      
+      const isSubscribed = OneSignal.User.PushSubscription.optedIn;
+      if (isSubscribed) {
+        alert("✨ Token successfully generated and routed to OneSignal!");
+      } else {
+        alert("⚠️ Browser allowed, but token generation failed. Service Worker is missing from the public folder.");
+      }
     } catch (error) {
-      alert("⚠️ Error connecting to push server. Check your OneSignal worker file.");
+      console.error("Permission request failed:", error);
+      alert("⚠️ Engine failure. Check F12 console logs.");
     }
   };
 
