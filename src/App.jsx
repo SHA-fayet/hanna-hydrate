@@ -142,20 +142,28 @@ export default function App() {
     setPassword("");
   };
 
-  const requestNotificationPermission = async () => {
+const requestNotificationPermission = async () => {
     try {
-      console.log("Requesting permission from OneSignal engine...");
-      await OneSignal.Notifications.requestPermission();
+      console.log("Current Notification Permission State:", Notification.permission);
       
-      const isSubscribed = OneSignal.User.PushSubscription.optedIn;
-      if (isSubscribed) {
-        alert("✨ Token successfully generated and routed to OneSignal!");
+      // Force direct native browser prompt, bypassing wrapper locks
+      const permissionResult = await OneSignal.Notifications.requestPermission();
+      console.log("Permission request result:", permissionResult);
+
+      const optedIn = OneSignal.User.PushSubscription.optedIn;
+      const token = OneSignal.User.PushSubscription.token;
+
+      console.log("Opted In Status:", optedIn);
+      console.log("Generated Token:", token);
+
+      if (optedIn && token) {
+        alert("✨ Push notifications successfully enabled and token secured!");
       } else {
-        alert("⚠️ Browser allowed, but token generation failed. Service Worker is missing from the public folder.");
+        alert(`⚠️ Prompt finished, but subscription token is missing. Permission state: ${Notification.permission}`);
       }
     } catch (error) {
-      console.error("Permission request failed:", error);
-      alert("⚠️ Engine failure. Check F12 console logs.");
+      console.error("Critical permission dispatch failure:", error);
+      alert("⚠️ Push registration error. Check F12 console logs.");
     }
   };
 
