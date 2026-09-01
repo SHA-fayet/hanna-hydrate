@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Droplet, Sparkles, Bell, RefreshCw, Heart, LogIn, LogOut, Lock, UserPlus, AlertCircle, User, Menu, X, Flower, Activity } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import OneSignal from 'react-onesignal';
 
 const MOTIVATION_TIPS = [
   "Water gives your skin that natural glowing highlight! ✨",
@@ -36,55 +37,48 @@ const BackgroundEffects = () => (
 );
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState(() => localStorage.getItem('hannahydrate_session') || "");
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('hannahydrate_session'));
   const [authMode, setAuthMode] = useState('login');
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
   const [target, setTarget] = useState(2000);
   const [consumed, setConsumed] = useState(0);
-  
-  // Dynamic Content States
   const [tipIndex, setTipIndex] = useState(0);
   const [currentSkinTip, setCurrentSkinTip] = useState("");
   const [currentHealthTip, setCurrentHealthTip] = useState("");
 
+// Initialize OneSignal on App Load
   useEffect(() => {
-    window.speechSynthesis.getVoices(); 
+    const initOneSignal = async () => {
+      await OneSignal.init({
+        appId: "f187475b-64ca-4313-8c8a-f70b8607d20c", 
+        allowLocalhostAsSecureOrigin: true,
+      });
+    };
+    initOneSignal();
+  }, []);
+
+  useEffect(() => {
     const randomizeContent = () => {
       setTipIndex(Math.floor(Math.random() * MOTIVATION_TIPS.length));
       setCurrentSkinTip(SKINCARE_TIPS[Math.floor(Math.random() * SKINCARE_TIPS.length)]);
       setCurrentHealthTip(HEALTH_TIPS[Math.floor(Math.random() * HEALTH_TIPS.length)]);
     };
     randomizeContent();
-    
     const contentInterval = setInterval(randomizeContent, 6 * 60 * 60 * 1000);
     return () => clearInterval(contentInterval);
   }, []);
-
-  const speakVoiceAlarm = (name) => {
-    if ('speechSynthesis' in window) {
-      const msg = new SpeechSynthesisUtterance(`Hey ${name}, it's time to glow! Grab a glass of water, gorgeous!`);
-      const voices = window.speechSynthesis.getVoices();
-      
-      const femaleVoice = voices.find(v => 
-        v.name.includes('Female') || v.name.includes('Samantha') || 
-        v.name.includes('Victoria') || v.name.includes('Zira') || v.name.includes('Google UK English Female')
-      );
-      
-      if (femaleVoice) msg.voice = femaleVoice;
-      msg.pitch = 1.3; 
-      msg.rate = 0.95; 
-      window.speechSynthesis.speak(msg);
-    }
-  };
 
   useEffect(() => {
     if (isAuthenticated) {
       const savedData = localStorage.getItem(`water_data_${username}`);
       setConsumed(savedData ? JSON.parse(savedData) : 0);
+      
+      // Tell OneSignal who this user is so they receive targeted pushes
+      OneSignal.login(username);
+      OneSignal.User.addTag("is_active", "true");
     }
   }, [isAuthenticated, username]);
 
@@ -96,21 +90,6 @@ export default function App() {
       }
     }
   }, [consumed, target, isAuthenticated, username]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      const reminderInterval = setInterval(() => {
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(`Time to Hydrate, ${username}! 💦`, {
-            body: "Take a sip and keep your skin glowing!",
-          });
-        }
-        speakVoiceAlarm(username);
-      }, 60 * 60 * 1000); 
-      
-      return () => clearInterval(reminderInterval);
-    }
-  }, [isAuthenticated, username]);
 
   const addWater = (amount) => {
     setConsumed((prev) => prev + amount);
@@ -129,14 +108,31 @@ export default function App() {
       }
       usersDB[username] = { password };
       localStorage.setItem('usersDB', JSON.stringify(usersDB));
+      localStorage.setItem('hannahydrate_session', username);
       setIsAuthenticated(true);
     } else {
       if (!usersDB[username] || usersDB[username].password !== password) {
         setError("Invalid username or password. ❌");
         return;
       }
+      localStorage.setItem('hannahydrate_session', username);
       setIsAuthenticated(true);
     }
+  };
+
+  const handleLogout = () => {
+    // Remove tags and logout from push server so they don't get alerts while logged out
+    OneSignal.User.removeTag("is_active");
+    OneSignal.logout();
+    
+    localStorage.removeItem('hannahydrate_session');
+    setIsAuthenticated(false);
+    setUsername("");
+    setPassword("");
+  };
+
+  const requestNotificationPermission = async () => {
+    await OneSignal.Notifications.requestPermission();
   };
 
   if (!isAuthenticated) {
@@ -183,13 +179,10 @@ export default function App() {
           <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:bg-barbie-light rounded-full transition"><X className="w-6 h-6 text-gray-500" /></button>
         </div>
         <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-6">
-          <p className="text-xs text-center text-gray-400 font-semibold uppercase tracking-widest">Updates Every 6 Hours</p>
-          
           <div className="bg-linear-to-br from-white to-barbie-light/40 p-4 rounded-2xl border border-barbie-pink/20 shadow-sm">
             <h3 className="font-bold text-barbie-deep flex items-center gap-2 mb-3"><Flower className="w-5 h-5 text-barbie-pink"/> Beauty Tip</h3>
             <p className="text-sm text-gray-700 leading-relaxed font-medium">{currentSkinTip}</p>
           </div>
-
           <div className="bg-linear-to-br from-white to-barbie-cyan/10 p-4 rounded-2xl border border-barbie-cyan/20 shadow-sm">
             <h3 className="font-bold text-barbie-deep flex items-center gap-2 mb-3"><Activity className="w-5 h-5 text-barbie-cyan"/> Health Tip</h3>
             <p className="text-sm text-gray-700 leading-relaxed font-medium">{currentHealthTip}</p>
@@ -202,17 +195,13 @@ export default function App() {
           <Sparkles className="w-5 h-5 animate-pulse text-barbie-deep" /> HannaHydrate
         </h1>
         <div className="flex gap-2">
-          <button onClick={() => {
-            if ("Notification" in window) Notification.requestPermission().then(p => {
-              if (p === "granted") new Notification("Enabled! ✨", { body: "Hourly reminders active." });
-            });
-          }} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-barbie-pink hover:scale-110 transition-transform">
+          <button onClick={requestNotificationPermission} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-barbie-pink hover:scale-110 transition-transform title='Enable Push Notifications'">
             <Bell className="w-5 h-5" />
           </button>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-barbie-deep hover:scale-110 transition-transform">
             <Menu className="w-5 h-5" />
           </button>
-          <button onClick={() => { setIsAuthenticated(false); setUsername(""); setPassword(""); }} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:text-red-500 hover:scale-110 transition-transform">
+          <button onClick={handleLogout} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-gray-400 hover:text-red-500 hover:scale-110 transition-transform">
             <LogOut className="w-5 h-5" />
           </button>
         </div>
