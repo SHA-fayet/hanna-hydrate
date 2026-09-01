@@ -49,7 +49,7 @@ export default function App() {
   const [currentSkinTip, setCurrentSkinTip] = useState("");
   const [currentHealthTip, setCurrentHealthTip] = useState("");
 
-// Initialize OneSignal on App Load
+  // Initialize OneSignal on App Load
   useEffect(() => {
     const initOneSignal = async () => {
       await OneSignal.init({
@@ -132,7 +132,24 @@ export default function App() {
   };
 
   const requestNotificationPermission = async () => {
-    await OneSignal.Notifications.requestPermission();
+    // Check if the browser natively blocked it
+    if (Notification.permission === "denied") {
+      alert("❌ Your browser is blocking notifications! Click the lock icon in the URL bar to fix it.");
+      return;
+    }
+    
+    // Check if they are already active
+    if (Notification.permission === "granted") {
+      alert("✨ You are already subscribed! Your hourly alerts are active.");
+      return;
+    }
+
+    // Otherwise, ask OneSignal to trigger the prompt
+    try {
+      await OneSignal.Notifications.requestPermission();
+    } catch (error) {
+      alert("⚠️ Error connecting to push server. Check your OneSignal worker file.");
+    }
   };
 
   if (!isAuthenticated) {
