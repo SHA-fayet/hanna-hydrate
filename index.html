@@ -2,11 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#E0218A" />
-    <title>Hanna_Hydrate</title>
+    <meta name="description" content="HannaHydrate is a cute daily water tracker with optional web push notifications." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>HannaHydrate</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function (OneSignal) {
+        await OneSignal.init({
+          appId: "f187475b-64ca-4313-8c8a-f70b8607d20c"
+        });
+        window.__HannaOneSignal = OneSignal;
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
