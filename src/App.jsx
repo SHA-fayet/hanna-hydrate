@@ -17,10 +17,8 @@ import {
   X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import OneSignal from 'react-onesignal';
 
 const ONESIGNAL_APP_ID = 'f187475b-64ca-4313-8c8a-f70b8607d20c';
-const SERVICE_WORKER_PATH = '/OneSignalSDKWorker.js';
 const DEFAULT_TARGET_ML = 2000;
 
 const MOTIVATION_TIPS = [
@@ -65,37 +63,37 @@ const getStoredUsers = () => {
   }
 };
 
-const waitForPushSubscription = async (timeoutMs = 15000) => {
+const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const getOneSignal = async (timeoutMs = 15000) => {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const subscription = OneSignal.User.PushSubscription;
+    if (window.__HannaOneSignal) {
+      return window.__HannaOneSignal;
+    }
+    await wait(250);
+  }
+
+  throw new Error(
+    `OneSignal SDK is not ready. Verify that the OneSignal script is present in index.html and that the App ID is ${ONESIGNAL_APP_ID}.`,
+  );
+};
+
+const waitForPushSubscription = async (OneSignal, timeoutMs = 15000) => {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const subscription = OneSignal?.User?.PushSubscription;
 
     if (subscription?.optedIn && subscription?.id) {
       return subscription;
     }
 
-    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    await wait(500);
   }
 
-  return OneSignal.User.PushSubscription;
-};
-
-// One shared promise prevents duplicate OneSignal.init() calls.
-let oneSignalInitPromise = null;
-
-const initOneSignal = () => {
-  if (!oneSignalInitPromise) {
-    oneSignalInitPromise = OneSignal.init({
-      appId: ONESIGNAL_APP_ID,
-      autoRegister: false,
-      autoResubscribe: true,
-      serviceWorkerPath: SERVICE_WORKER_PATH,
-      allowLocalhostAsSecureOrigin: true,
-    });
-  }
-
-  return oneSignalInitPromise;
+  return OneSignal?.User?.PushSubscription;
 };
 
 const BackgroundEffects = () => (
@@ -155,20 +153,26 @@ export default function App() {
 
     const setupOneSignal = async () => {
       try {
-        await initOneSignal();
+        const OneSignal = await getOneSignal();
 
         if (cancelled) return;
 
         setOneSignalReady(true);
 
-        const current = OneSignal.User.PushSubscription;
+        const current = OneSignal?.User?.PushSubscription;
         setNotificationStatus(current?.optedIn && current?.id ? 'enabled' : 'disabled');
 
         console.info('✅ OneSignal initialized');
-        console.info('Push supported:', OneSignal.Notifications.isPushSupported());
-        console.info('Native permission:', OneSignal.Notifications.permissionNative);
+        console.info('OneSignal App ID:', ONESIGNAL_APP_ID);
+        console.info(
+          'Push supported:',
+          typeof OneSignal.Notifications?.isPushSupported === 'function'
+            ? OneSignal.Notifications.isPushSupported()
+            : 'unknown',
+        );
+        console.info('Native permission:', OneSignal.Notifications?.permissionNative);
       } catch (err) {
-        console.error('❌ OneSignal initialization failed:', err);
+        console.error('❌ OneSignal setup failed:', err);
 
         if (!cancelled) {
           setOneSignalReady(false);
@@ -187,18 +191,32 @@ export default function App() {
   useEffect(() => {
     if (!oneSignalReady) return undefined;
 
-    const handleSubscriptionChange = (change) => {
-      const current = change?.current;
-      const enabled = Boolean(current?.optedIn && current?.id);
+    let cleanup;
 
-      console.info('🔔 Push subscription changed:', current);
-      setNotificationStatus(enabled ? 'enabled' : 'disabled');
+    const registerListener = async () => {
+      try {
+        const OneSignal = await getOneSignal();
+        const pushSubscription = OneSignal.User.PushSubscription;
+
+        const handleSubscriptionChange = (change) => {
+          const current = change?.current;
+          const enabled = Boolean(current?.optedIn && current?.id);
+
+          console.info('🔔 Push subscription changed:', current);
+          setNotificationStatus(enabled ? 'enabled' : 'disabled');
+        };
+
+        pushSubscription.addEventListener('change', handleSubscriptionChange);
+        cleanup = () => pushSubscription.removeEventListener('change', handleSubscriptionChange);
+      } catch (err) {
+        console.error('Push subscription listener setup failed:', err);
+      }
     };
 
-    OneSignal.User.PushSubscription.addEventListener('change', handleSubscriptionChange);
+    registerListener();
 
     return () => {
-      OneSignal.User.PushSubscription.removeEventListener('change', handleSubscriptionChange);
+      cleanup?.();
     };
   }, [oneSignalReady]);
 
@@ -222,30 +240,23 @@ export default function App() {
     return () => window.clearInterval(contentInterval);
   }, []);
 
-  useEffect(() => {
-    if (!isAuthenticated || !username) return undefined;
+useEffect(() => {
+  if (!isAuthenticated || !username) return undefined;
 
-    let cancelled = false;
+  const syncUserWithOneSignal = async () => {
+    try {
+      await getOneSignal();
 
-    const syncUserWithOneSignal = async () => {
-      try {
-        await initOneSignal();
-        if (cancelled) return;
+      console.info(`✅ HannaHydrate login detected: ${username}`);
+    } catch (err) {
+      console.error('OneSignal availability check failed:', err);
+    }
+  };
 
-        await OneSignal.login(username);
-        OneSignal.User.addTag('is_active', 'true');
-        console.info(`✅ OneSignal user logged in as: ${username}`);
-      } catch (err) {
-        console.error('OneSignal user sync error:', err);
-      }
-    };
+  syncUserWithOneSignal();
 
-    syncUserWithOneSignal();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, username]);
+  return undefined;
+}, [isAuthenticated, username]);
 
   useEffect(() => {
     if (!isAuthenticated || !username) return;
@@ -301,22 +312,13 @@ export default function App() {
     setIsAuthenticated(true);
   };
 
-  const handleLogout = async () => {
-    try {
-      if (oneSignalReady) {
-        OneSignal.User.removeTag('is_active');
-        await OneSignal.logout();
-      }
-    } catch (err) {
-      console.error('OneSignal logout error:', err);
-    } finally {
-      localStorage.removeItem('hannahydrate_session');
-      setIsAuthenticated(false);
-      setUsername('');
-      setConsumed(0);
-      setPassword('');
-      setIsSidebarOpen(false);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('hannahydrate_session');
+    setIsAuthenticated(false);
+    setUsername('');
+    setConsumed(0);
+    setPassword('');
+    setIsSidebarOpen(false);
   };
 
   const requestNotificationPermission = async () => {
@@ -326,16 +328,19 @@ export default function App() {
 
     try {
       console.info('🔔 Notification setup started');
-      await initOneSignal();
-      setOneSignalReady(true);
 
-      if (!OneSignal.Notifications.isPushSupported()) {
+      const OneSignal = await getOneSignal();
+
+      if (
+        typeof OneSignal.Notifications?.isPushSupported === 'function' &&
+        !OneSignal.Notifications.isPushSupported()
+      ) {
         setNotificationStatus('error');
         alert('❌ This browser does not support web push notifications.');
         return;
       }
 
-      const nativePermission = OneSignal.Notifications.permissionNative;
+      const nativePermission = OneSignal.Notifications?.permissionNative;
       console.info('Browser notification permission:', nativePermission);
 
       if (nativePermission === 'denied') {
@@ -357,10 +362,9 @@ export default function App() {
         }
       }
 
-      // Calling optIn after native permission ensures OneSignal creates the web push subscription.
       await OneSignal.User.PushSubscription.optIn();
 
-      const subscription = await waitForPushSubscription();
+      const subscription = await waitForPushSubscription(OneSignal);
 
       console.info('🔔 OneSignal subscription:', {
         id: subscription?.id,
@@ -374,7 +378,7 @@ export default function App() {
       } else {
         setNotificationStatus('disabled');
         alert(
-          '⚠️ Browser permission is enabled, but OneSignal did not create a push subscription yet. Check the browser console and the service-worker URL.',
+          '⚠️ Browser permission is enabled, but OneSignal did not create a push subscription yet. Check the service-worker URL and browser console.',
         );
       }
     } catch (err) {
