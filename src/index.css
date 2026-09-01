@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
+/* Forces Tailwind v4 to respect the React class toggle instead of your OS settings */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-barbie-pink: #E0218A;
   --color-barbie-deep: #C2185B;
@@ -16,7 +19,6 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Ensure body dark mode fallback for absolute root */
 html.dark body {
   background-color: #111827; 
   color: #F9FAFB;
