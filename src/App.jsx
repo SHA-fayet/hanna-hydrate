@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState, useEffect } from 'react';
+=======
+import React, { useState, useEffect } from 'react';
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
 import { Droplet, Sparkles, Bell, RefreshCw, Heart, LogIn, LogOut, Lock, UserPlus, AlertCircle, User, Menu, X, Flower, Activity } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import OneSignal from 'react-onesignal';
@@ -36,6 +40,7 @@ const BackgroundEffects = () => (
   </div>
 );
 
+<<<<<<< HEAD
 // One shared initialization promise prevents duplicate OneSignal SDK setup
 // across React renders and development StrictMode cycles.
 let oneSignalInitPromise = null;
@@ -51,6 +56,10 @@ const initOneSignal = () => {
   }
   return oneSignalInitPromise;
 };
+=======
+// Global flag to prevent React StrictMode double-initialization crashes
+let oneSignalInitialized = false;
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
 
 export default function App() {
   const [username, setUsername] = useState(() => localStorage.getItem('hannahydrate_session') || "");
@@ -59,11 +68,16 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+<<<<<<< HEAD
   const [target] = useState(2000);
+=======
+  const [target, setTarget] = useState(2000);
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
   const [consumed, setConsumed] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [currentSkinTip, setCurrentSkinTip] = useState("");
   const [currentHealthTip, setCurrentHealthTip] = useState("");
+<<<<<<< HEAD
   const [oneSignalReady, setOneSignalReady] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState('checking');
 
@@ -83,6 +97,21 @@ export default function App() {
       });
 
     return () => { cancelled = true; };
+=======
+
+  useEffect(() => {
+    if (!oneSignalInitialized) {
+      OneSignal.init({
+        appId: "f187475b-64ca-4313-8c8a-f70b8607d20c",
+        allowLocalhostAsSecureOrigin: true,
+      }).then(() => {
+        oneSignalInitialized = true;
+        console.log("OneSignal Successfully Initialized");
+      }).catch(err => {
+        console.error("OneSignal Init Error:", err);
+      });
+    }
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
   }, []);
 
   useEffect(() => {
@@ -97,6 +126,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+<<<<<<< HEAD
     const syncUserWithOneSignal = async () => {
       const savedData = localStorage.getItem(`water_data_${username}`);
       setConsumed(savedData ? JSON.parse(savedData) : 0);
@@ -113,6 +143,18 @@ export default function App() {
     };
 
     syncUserWithOneSignal();
+=======
+    if (isAuthenticated && oneSignalInitialized) {
+      const savedData = localStorage.getItem(`water_data_${username}`);
+      setConsumed(savedData ? JSON.parse(savedData) : 0);
+      
+      try {
+        OneSignal.User.addTag("is_active", "true");
+      } catch (err) {
+        console.error("Tagging error:", err);
+      }
+    }
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
   }, [isAuthenticated, username]);
 
   useEffect(() => {
@@ -153,6 +195,7 @@ export default function App() {
     }
   };
 
+<<<<<<< HEAD
   const handleLogout = async () => {
     try {
       if (oneSignalReady) {
@@ -163,6 +206,16 @@ export default function App() {
       console.error('OneSignal logout error:', err);
     }
 
+=======
+  const handleLogout = () => {
+    if (oneSignalInitialized) {
+      try {
+        OneSignal.User.removeTag("is_active");
+      } catch (err) {
+        console.error("Untagging error:", err);
+      }
+    }
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
     localStorage.removeItem('hannahydrate_session');
     setIsAuthenticated(false);
     setUsername("");
@@ -171,6 +224,7 @@ export default function App() {
 
 const requestNotificationPermission = async () => {
     try {
+<<<<<<< HEAD
       await initOneSignal();
       setOneSignalReady(true);
 
@@ -211,6 +265,28 @@ const requestNotificationPermission = async () => {
       console.error('Critical permission dispatch failure:', error);
       setNotificationStatus('error');
       alert('⚠️ Push registration failed. Check the browser console and verify that /OneSignalSDKWorker.js is publicly accessible.');
+=======
+      console.log("Current Notification Permission State:", Notification.permission);
+      
+      // Force direct native browser prompt, bypassing wrapper locks
+      const permissionResult = await OneSignal.Notifications.requestPermission();
+      console.log("Permission request result:", permissionResult);
+
+      const optedIn = OneSignal.User.PushSubscription.optedIn;
+      const token = OneSignal.User.PushSubscription.token;
+
+      console.log("Opted In Status:", optedIn);
+      console.log("Generated Token:", token);
+
+      if (optedIn && token) {
+        alert("✨ Push notifications successfully enabled and token secured!");
+      } else {
+        alert(`⚠️ Prompt finished, but subscription token is missing. Permission state: ${Notification.permission}`);
+      }
+    } catch (error) {
+      console.error("Critical permission dispatch failure:", error);
+      alert("⚠️ Push registration error. Check F12 console logs.");
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
     }
   };
 
@@ -274,6 +350,7 @@ const requestNotificationPermission = async () => {
           <Sparkles className="w-5 h-5 animate-pulse text-barbie-deep" /> HannaHydrate
         </h1>
         <div className="flex gap-2">
+<<<<<<< HEAD
           <button
             onClick={requestNotificationPermission}
             disabled={!oneSignalReady}
@@ -287,6 +364,10 @@ const requestNotificationPermission = async () => {
             className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-barbie-pink hover:scale-110 transition-transform disabled:opacity-40 disabled:hover:scale-100"
           >
             <Bell className={oneSignalReady && notificationStatus === 'enabled' ? 'w-5 h-5 fill-current' : 'w-5 h-5'} />
+=======
+          <button onClick={requestNotificationPermission} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-barbie-pink hover:scale-110 transition-transform title='Enable Push Notifications'">
+            <Bell className="w-5 h-5" />
+>>>>>>> 257fecff2ceed233944f41f945f49b63dad1677c
           </button>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md text-barbie-deep hover:scale-110 transition-transform">
             <Menu className="w-5 h-5" />
