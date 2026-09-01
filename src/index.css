@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-barbie-pink: #E0218A;
+  --color-barbie-deep: #C2185B;
+  --color-barbie-light: #FCE7F3;
+  --color-barbie-soft: #FDF2F8;
+  --color-barbie-cyan: #22D3EE;
+}
+
+body {
+  font-family: 'Quicksand', sans-serif;
+  background-color: var(--color-barbie-soft);
+  color: #374151;
+}
