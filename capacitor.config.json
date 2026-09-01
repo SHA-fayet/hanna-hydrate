@@ -1,0 +1,6 @@
+{
+  "appId": "com.hannahydrate.app",
+  "appName": "HannaHydrate",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
-/* Forces Tailwind v4 to respect the React class toggle instead of your OS settings */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
