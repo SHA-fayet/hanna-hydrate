@@ -1,0 +1,16 @@
+{
+  "name": "HannaHydrate",
+  "short_name": "HannaHydrate",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFE4F2",
+  "theme_color": "#E0218A",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
